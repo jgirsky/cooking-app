@@ -1,28 +1,14 @@
-import { useEffect, useState } from 'react'
-import { supabase } from './supabaseClient'
+import Onboarding from './Onboarding'
 
 function App() {
-  const [status, setStatus] = useState('checking...')
-
-  useEffect(() => {
-    async function checkConnection() {
-      // Simple check: ask Supabase for the current session.
-      // This works even before we've created any tables.
-      const { error } = await supabase.auth.getSession()
-      if (error) {
-        setStatus(`Connection error: ${error.message}`)
-      } else {
-        setStatus('Connected to Supabase ✅')
-      }
-    }
-    checkConnection()
-  }, [])
-
   return (
-    <div style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: 480, margin: '0 auto' }}>
+    <div style={{ fontFamily: 'sans-serif', padding: '2rem', maxWidth: 640, margin: '0 auto' }}>
       <h1>Cooking App</h1>
-      <p>Starter project is running.</p>
-      <p>Supabase status: {status}</p>
+      <p style={{ color: '#555' }}>
+        Tell us what you like, what to avoid, and what you're aiming for. You can come back and
+        change this anytime.
+      </p>
+      <Onboarding />
     </div>
   )
 }
