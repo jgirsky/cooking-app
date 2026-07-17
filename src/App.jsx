@@ -7,6 +7,7 @@ import EditRecipe from './EditRecipe'
 import Meals from './Meals'
 import AddMeal from './AddMeal'
 import MealDetail from './MealDetail'
+import WeekPlanner from './WeekPlanner'
 
 const RECIPE_VIEWS = ['recipes', 'recipe-detail', 'add-recipe', 'edit-recipe']
 const MEAL_VIEWS = ['meals', 'meal-detail', 'add-meal']
@@ -64,6 +65,9 @@ function App() {
         <button onClick={goToMeals} style={navButtonStyle(MEAL_VIEWS.includes(view))}>
           Meals
         </button>
+        <button onClick={() => setView('plan')} style={navButtonStyle(view === 'plan')}>
+          Weekly Plan
+        </button>
         <button onClick={() => setView('preferences')} style={navButtonStyle(view === 'preferences')}>
           Preferences
         </button>
@@ -115,6 +119,8 @@ function App() {
       {view === 'meal-detail' && selectedMealId && (
         <MealDetail mealId={selectedMealId} onBack={goToMeals} />
       )}
+
+      {view === 'plan' && <WeekPlanner />}
     </div>
   )
 }
