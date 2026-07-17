@@ -3,11 +3,12 @@ import Onboarding from './Onboarding'
 import RecipeLibrary from './RecipeLibrary'
 import RecipeDetail from './RecipeDetail'
 import AddRecipe from './AddRecipe'
+import EditRecipe from './EditRecipe'
 import Meals from './Meals'
 import AddMeal from './AddMeal'
 import MealDetail from './MealDetail'
 
-const RECIPE_VIEWS = ['recipes', 'recipe-detail', 'add-recipe']
+const RECIPE_VIEWS = ['recipes', 'recipe-detail', 'add-recipe', 'edit-recipe']
 const MEAL_VIEWS = ['meals', 'meal-detail', 'add-meal']
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
   const [selectedRecipeId, setSelectedRecipeId] = useState(null)
   const [selectedMealId, setSelectedMealId] = useState(null)
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0)
+  const [recipeDetailRefreshKey, setRecipeDetailRefreshKey] = useState(0)
   const [mealsRefreshKey, setMealsRefreshKey] = useState(0)
 
   function goToRecipes() {
@@ -38,6 +40,12 @@ function App() {
   function handleRecipeSaved() {
     setLibraryRefreshKey((key) => key + 1)
     goToRecipes()
+  }
+
+  function handleRecipeEdited() {
+    setLibraryRefreshKey((key) => key + 1)
+    setRecipeDetailRefreshKey((key) => key + 1)
+    setView('recipe-detail')
   }
 
   function handleMealSaved() {
@@ -82,7 +90,20 @@ function App() {
       {view === 'add-recipe' && <AddRecipe onSaved={handleRecipeSaved} onCancel={goToRecipes} />}
 
       {view === 'recipe-detail' && selectedRecipeId && (
-        <RecipeDetail recipeId={selectedRecipeId} onBack={goToRecipes} />
+        <RecipeDetail
+          recipeId={selectedRecipeId}
+          onBack={goToRecipes}
+          onEdit={() => setView('edit-recipe')}
+          refreshKey={recipeDetailRefreshKey}
+        />
+      )}
+
+      {view === 'edit-recipe' && selectedRecipeId && (
+        <EditRecipe
+          recipeId={selectedRecipeId}
+          onSaved={handleRecipeEdited}
+          onCancel={() => setView('recipe-detail')}
+        />
       )}
 
       {view === 'meals' && (

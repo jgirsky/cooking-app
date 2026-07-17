@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
-import ComponentSelect from './ComponentSelect'
 
 const SOURCE_LABELS = {
   tiktok: 'TikTok',
@@ -9,22 +8,18 @@ const SOURCE_LABELS = {
   original: 'Original',
 }
 
-function RecipeDetail({ recipeId, onBack }) {
+function RecipeDetail({ recipeId, onBack, onEdit, refreshKey }) {
   const [recipe, setRecipe] = useState(null)
   const [ingredients, setIngredients] = useState([])
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
-  const [isComponentOption, setIsComponentOption] = useState(false)
-  const [componentId, setComponentId] = useState('')
-  const [savingComponent, setSavingComponent] = useState(false)
-  const [componentSavedMessage, setComponentSavedMessage] = useState('')
 
   useEffect(() => {
     async function loadRecipe() {
       setLoading(true)
       const [{ data: recipeData, error: recipeError }, { data: ingredientData, error: ingredientError }] =
         await Promise.all([
-          supabase.from('recipes').select('*').eq('id', recipeId).single(),
+          supabase.from('recipes').select('*, components(name)').eq('id', recipeId).single(),
           supabase
             .from('recipe_ingredients')
             .select('id, quantity, unit, raw_text, ingredients(name)')
@@ -35,8 +30,6 @@ function RecipeDetail({ recipeId, onBack }) {
         setErrorMessage(`Couldn't load recipe: ${recipeError.message}`)
       } else {
         setRecipe(recipeData)
-        setIsComponentOption(recipeData.is_component_option || false)
-        setComponentId(recipeData.component_id || '')
       }
       if (!ingredientError) {
         setIngredients(ingredientData || [])
@@ -44,26 +37,7 @@ function RecipeDetail({ recipeId, onBack }) {
       setLoading(false)
     }
     loadRecipe()
-  }, [recipeId])
-
-  async function handleSaveComponent() {
-    setSavingComponent(true)
-    setComponentSavedMessage('')
-    const { error } = await supabase
-      .from('recipes')
-      .update({
-        is_component_option: isComponentOption,
-        component_id: isComponentOption && componentId ? componentId : null,
-      })
-      .eq('id', recipeId)
-
-    if (error) {
-      setComponentSavedMessage(`Couldn't save: ${error.message}`)
-    } else {
-      setComponentSavedMessage('Saved.')
-    }
-    setSavingComponent(false)
-  }
+  }, [recipeId, refreshKey])
 
   if (loading) return <p>Loading...</p>
   if (errorMessage) return <p style={{ color: '#b3261e' }}>{errorMessage}</p>
@@ -75,11 +49,20 @@ function RecipeDetail({ recipeId, onBack }) {
         ← Back to My Recipes
       </button>
 
-      <h2>{recipe.title}</h2>
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', fontSize: '0.85rem', color: '#555' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <h2 style={{ marginTop: 0 }}>{recipe.title}</h2>
+        <button onClick={onEdit} style={smallButtonStyle}>
+          Edit
+        </button>
+      </div>
+
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', fontSize: '0.85rem', color: '#555', flexWrap: 'wrap' }}>
         <span style={badgeStyle}>{SOURCE_LABELS[recipe.source_type] || recipe.source_type}</span>
         <span style={badgeStyle}>{recipe.capture_status === 'structured' ? 'Structured' : 'Quick capture'}</span>
         {recipe.servings_default && <span style={badgeStyle}>Serves {recipe.servings_default}</span>}
+        {recipe.is_component_option && recipe.components?.name && (
+          <span style={badgeStyle}>Component: {recipe.components.name}</span>
+        )}
       </div>
 
       {recipe.source_url && (
@@ -90,27 +73,6 @@ function RecipeDetail({ recipeId, onBack }) {
           </a>
         </p>
       )}
-
-      <section style={{ marginBottom: '1rem', border: '1px solid #ddd', borderRadius: '6px', padding: '0.75rem 1rem' }}>
-        <h3 style={{ marginTop: 0 }}>Component settings</h3>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-          <input
-            type="checkbox"
-            checked={isComponentOption}
-            onChange={(e) => setIsComponentOption(e.target.checked)}
-          />
-          This is a reusable component (a protein, vegetable, grain, sauce, etc.)
-        </label>
-        {isComponentOption && (
-          <div style={{ marginBottom: '0.75rem' }}>
-            <ComponentSelect value={componentId} onChange={setComponentId} />
-          </div>
-        )}
-        <button onClick={handleSaveComponent} disabled={savingComponent} style={smallButtonStyle}>
-          {savingComponent ? 'Saving...' : 'Save'}
-        </button>
-        {componentSavedMessage && <span style={{ marginLeft: '0.75rem', fontSize: '0.9rem' }}>{componentSavedMessage}</span>}
-      </section>
 
       {ingredients.length > 0 && (
         <section style={{ marginBottom: '1rem' }}>
