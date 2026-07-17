@@ -44,6 +44,7 @@ function WeekPlanner() {
   const [errorMessage, setErrorMessage] = useState('')
   const [editingKey, setEditingKey] = useState(null)
   const [selectedValue, setSelectedValue] = useState('')
+  const [skipReason, setSkipReason] = useState('')
   const [savingSlot, setSavingSlot] = useState(false)
 
   useEffect(() => {
@@ -88,22 +89,44 @@ function WeekPlanner() {
 
   function handleOpenEditor(key, row) {
     setEditingKey(key)
-    setSelectedValue(row ? (row.recipe_id ? `recipe:${row.recipe_id}` : `meal:${row.meal_id}`) : '')
+    if (!row) {
+      setSelectedValue('')
+      setSkipReason('')
+    } else if (row.status === 'skipped') {
+      setSelectedValue('skip')
+      setSkipReason(row.skip_reason || '')
+    } else {
+      setSelectedValue(row.recipe_id ? `recipe:${row.recipe_id}` : `meal:${row.meal_id}`)
+      setSkipReason('')
+    }
   }
 
   function handleCancelEdit() {
     setEditingKey(null)
     setSelectedValue('')
+    setSkipReason('')
   }
 
   async function handleSaveSlot(dateStr, slotType) {
     setSavingSlot(true)
-    const existingRow = slotsMap[`${dateStr}|${slotType}`]
 
     if (!selectedValue) {
+      const existingRow = slotsMap[`${dateStr}|${slotType}`]
       if (existingRow) {
         await supabase.from('planned_meals').delete().eq('id', existingRow.id)
       }
+    } else if (selectedValue === 'skip') {
+      await supabase.from('planned_meals').upsert(
+        {
+          plan_date: dateStr,
+          slot_type: slotType,
+          recipe_id: null,
+          meal_id: null,
+          status: 'skipped',
+          skip_reason: skipReason.trim() || null,
+        },
+        { onConflict: 'plan_date,slot_type' }
+      )
     } else {
       const [type, id] = selectedValue.split(':')
       await supabase.from('planned_meals').upsert(
@@ -112,6 +135,8 @@ function WeekPlanner() {
           slot_type: slotType,
           recipe_id: type === 'recipe' ? id : null,
           meal_id: type === 'meal' ? id : null,
+          status: 'planned',
+          skip_reason: null,
         },
         { onConflict: 'plan_date,slot_type' }
       )
@@ -119,6 +144,7 @@ function WeekPlanner() {
 
     setEditingKey(null)
     setSelectedValue('')
+    setSkipReason('')
     await loadWeek()
     setSavingSlot(false)
   }
@@ -164,7 +190,11 @@ function WeekPlanner() {
                 const key = `${dateStr}|${slotType}`
                 const row = slotsMap[key]
                 const isEditing = editingKey === key
-                const label = row ? row.recipes?.title || row.meals?.name : null
+                const label = row
+                  ? row.status === 'skipped'
+                    ? `Not cooking${row.skip_reason ? ` — ${row.skip_reason}` : ''}`
+                    : row.recipes?.title || row.meals?.name
+                  : null
 
                 return (
                   <div key={slotType} style={slotRowStyle}>
@@ -178,6 +208,7 @@ function WeekPlanner() {
                           style={selectStyle}
                         >
                           <option value="">-- Nothing planned --</option>
+                          <option value="skip">Not cooking (eating out / provided)</option>
                           {recipeOptions.length > 0 && (
                             <optgroup label="Recipes">
                               {recipeOptions.map((r) => (
@@ -197,6 +228,15 @@ function WeekPlanner() {
                             </optgroup>
                           )}
                         </select>
+                        {selectedValue === 'skip' && (
+                          <input
+                            type="text"
+                            value={skipReason}
+                            onChange={(e) => setSkipReason(e.target.value)}
+                            placeholder="Why (optional): eating out, work lunch..."
+                            style={{ ...selectStyle, flex: 1, minWidth: '180px' }}
+                          />
+                        )}
                         <button
                           type="button"
                           onClick={() => handleSaveSlot(dateStr, slotType)}
