@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
+import ComponentSelect from './ComponentSelect'
 
 const emptyIngredientRow = { name: '', quantity: '', unit: '' }
 
@@ -11,6 +12,8 @@ function AddRecipe({ onSaved, onCancel }) {
   const [servingsDefault, setServingsDefault] = useState('')
   const [notes, setNotes] = useState('')
   const [ingredientRows, setIngredientRows] = useState([{ ...emptyIngredientRow }])
+  const [isComponentOption, setIsComponentOption] = useState(false)
+  const [componentId, setComponentId] = useState('')
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -76,6 +79,8 @@ function AddRecipe({ onSaved, onCancel }) {
           servings_default: servingsDefault ? Number(servingsDefault) : null,
           capture_status: captureStatus,
           notes: notes.trim() || null,
+          is_component_option: isComponentOption,
+          component_id: isComponentOption && componentId ? componentId : null,
         })
         .select('id')
         .single()
@@ -152,6 +157,24 @@ function AddRecipe({ onSaved, onCancel }) {
             style={inputStyle}
           />
         </label>
+      </section>
+
+      <section>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <input
+            type="checkbox"
+            checked={isComponentOption}
+            onChange={(e) => setIsComponentOption(e.target.checked)}
+          />
+          This is a reusable component (a protein, vegetable, grain, sauce, etc. you might swap in and
+          out of different meals)
+        </label>
+        {isComponentOption && (
+          <label style={labelStyle}>
+            Component category
+            <ComponentSelect value={componentId} onChange={setComponentId} />
+          </label>
+        )}
       </section>
 
       <section>

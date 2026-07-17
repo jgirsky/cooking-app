@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import ComponentSelect from './ComponentSelect'
 
 const SOURCE_LABELS = {
   tiktok: 'TikTok',
@@ -13,6 +14,10 @@ function RecipeDetail({ recipeId, onBack }) {
   const [ingredients, setIngredients] = useState([])
   const [loading, setLoading] = useState(true)
   const [errorMessage, setErrorMessage] = useState('')
+  const [isComponentOption, setIsComponentOption] = useState(false)
+  const [componentId, setComponentId] = useState('')
+  const [savingComponent, setSavingComponent] = useState(false)
+  const [componentSavedMessage, setComponentSavedMessage] = useState('')
 
   useEffect(() => {
     async function loadRecipe() {
@@ -30,6 +35,8 @@ function RecipeDetail({ recipeId, onBack }) {
         setErrorMessage(`Couldn't load recipe: ${recipeError.message}`)
       } else {
         setRecipe(recipeData)
+        setIsComponentOption(recipeData.is_component_option || false)
+        setComponentId(recipeData.component_id || '')
       }
       if (!ingredientError) {
         setIngredients(ingredientData || [])
@@ -38,6 +45,25 @@ function RecipeDetail({ recipeId, onBack }) {
     }
     loadRecipe()
   }, [recipeId])
+
+  async function handleSaveComponent() {
+    setSavingComponent(true)
+    setComponentSavedMessage('')
+    const { error } = await supabase
+      .from('recipes')
+      .update({
+        is_component_option: isComponentOption,
+        component_id: isComponentOption && componentId ? componentId : null,
+      })
+      .eq('id', recipeId)
+
+    if (error) {
+      setComponentSavedMessage(`Couldn't save: ${error.message}`)
+    } else {
+      setComponentSavedMessage('Saved.')
+    }
+    setSavingComponent(false)
+  }
 
   if (loading) return <p>Loading...</p>
   if (errorMessage) return <p style={{ color: '#b3261e' }}>{errorMessage}</p>
@@ -64,6 +90,27 @@ function RecipeDetail({ recipeId, onBack }) {
           </a>
         </p>
       )}
+
+      <section style={{ marginBottom: '1rem', border: '1px solid #ddd', borderRadius: '6px', padding: '0.75rem 1rem' }}>
+        <h3 style={{ marginTop: 0 }}>Component settings</h3>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <input
+            type="checkbox"
+            checked={isComponentOption}
+            onChange={(e) => setIsComponentOption(e.target.checked)}
+          />
+          This is a reusable component (a protein, vegetable, grain, sauce, etc.)
+        </label>
+        {isComponentOption && (
+          <div style={{ marginBottom: '0.75rem' }}>
+            <ComponentSelect value={componentId} onChange={setComponentId} />
+          </div>
+        )}
+        <button onClick={handleSaveComponent} disabled={savingComponent} style={smallButtonStyle}>
+          {savingComponent ? 'Saving...' : 'Save'}
+        </button>
+        {componentSavedMessage && <span style={{ marginLeft: '0.75rem', fontSize: '0.9rem' }}>{componentSavedMessage}</span>}
+      </section>
 
       {ingredients.length > 0 && (
         <section style={{ marginBottom: '1rem' }}>
@@ -111,6 +158,16 @@ const backButtonStyle = {
   padding: 0,
   marginBottom: '1rem',
   fontSize: '0.95rem',
+}
+
+const smallButtonStyle = {
+  padding: '0.4rem 0.75rem',
+  fontSize: '0.9rem',
+  backgroundColor: '#2f7a4d',
+  color: 'white',
+  border: 'none',
+  borderRadius: '4px',
+  cursor: 'pointer',
 }
 
 export default RecipeDetail

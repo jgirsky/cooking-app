@@ -3,14 +3,26 @@ import Onboarding from './Onboarding'
 import RecipeLibrary from './RecipeLibrary'
 import RecipeDetail from './RecipeDetail'
 import AddRecipe from './AddRecipe'
+import Meals from './Meals'
+import AddMeal from './AddMeal'
+import MealDetail from './MealDetail'
+
+const RECIPE_VIEWS = ['recipes', 'recipe-detail', 'add-recipe']
+const MEAL_VIEWS = ['meals', 'meal-detail', 'add-meal']
 
 function App() {
-  const [view, setView] = useState('recipes') // 'recipes' | 'add-recipe' | 'recipe-detail' | 'preferences'
+  const [view, setView] = useState('recipes')
   const [selectedRecipeId, setSelectedRecipeId] = useState(null)
+  const [selectedMealId, setSelectedMealId] = useState(null)
   const [libraryRefreshKey, setLibraryRefreshKey] = useState(0)
+  const [mealsRefreshKey, setMealsRefreshKey] = useState(0)
 
   function goToRecipes() {
     setView('recipes')
+  }
+
+  function goToMeals() {
+    setView('meals')
   }
 
   function handleSelectRecipe(id) {
@@ -18,9 +30,19 @@ function App() {
     setView('recipe-detail')
   }
 
+  function handleSelectMeal(id) {
+    setSelectedMealId(id)
+    setView('meal-detail')
+  }
+
   function handleRecipeSaved() {
     setLibraryRefreshKey((key) => key + 1)
     goToRecipes()
+  }
+
+  function handleMealSaved() {
+    setMealsRefreshKey((key) => key + 1)
+    goToMeals()
   }
 
   return (
@@ -28,8 +50,11 @@ function App() {
       <h1 style={{ marginBottom: '0.25rem' }}>Cooking App</h1>
 
       <nav style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', borderBottom: '1px solid #ddd', paddingBottom: '0.75rem' }}>
-        <button onClick={goToRecipes} style={navButtonStyle(view === 'recipes' || view === 'recipe-detail' || view === 'add-recipe')}>
+        <button onClick={goToRecipes} style={navButtonStyle(RECIPE_VIEWS.includes(view))}>
           My Recipes
+        </button>
+        <button onClick={goToMeals} style={navButtonStyle(MEAL_VIEWS.includes(view))}>
+          Meals
         </button>
         <button onClick={() => setView('preferences')} style={navButtonStyle(view === 'preferences')}>
           Preferences
@@ -58,6 +83,16 @@ function App() {
 
       {view === 'recipe-detail' && selectedRecipeId && (
         <RecipeDetail recipeId={selectedRecipeId} onBack={goToRecipes} />
+      )}
+
+      {view === 'meals' && (
+        <Meals onAddClick={() => setView('add-meal')} onSelectMeal={handleSelectMeal} refreshKey={mealsRefreshKey} />
+      )}
+
+      {view === 'add-meal' && <AddMeal onSaved={handleMealSaved} onCancel={goToMeals} />}
+
+      {view === 'meal-detail' && selectedMealId && (
+        <MealDetail mealId={selectedMealId} onBack={goToMeals} />
       )}
     </div>
   )
