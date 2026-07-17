@@ -31,6 +31,14 @@ function addDays(date, n) {
   return d
 }
 
+// Parsing a "YYYY-MM-DD" string with `new Date(str)` treats it as UTC, which
+// can shift by a day depending on the browser's timezone. Parse the parts
+// directly so "next day" math stays correct locally.
+function parseISODate(str) {
+  const [y, m, d] = str.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 function formatDayLabel(date) {
   return date.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
 }
@@ -45,6 +53,8 @@ function WeekPlanner() {
   const [editingKey, setEditingKey] = useState(null)
   const [selectedValue, setSelectedValue] = useState('')
   const [skipReason, setSkipReason] = useState('')
+  const [servingsMade, setServingsMade] = useState('')
+  const [servingsPerSitting, setServingsPerSitting] = useState('')
   const [savingSlot, setSavingSlot] = useState(false)
 
   useEffect(() => {
@@ -92,12 +102,18 @@ function WeekPlanner() {
     if (!row) {
       setSelectedValue('')
       setSkipReason('')
+      setServingsMade('')
+      setServingsPerSitting('')
     } else if (row.status === 'skipped') {
       setSelectedValue('skip')
       setSkipReason(row.skip_reason || '')
+      setServingsMade('')
+      setServingsPerSitting('')
     } else {
       setSelectedValue(row.recipe_id ? `recipe:${row.recipe_id}` : `meal:${row.meal_id}`)
       setSkipReason('')
+      setServingsMade(row.servings_made ?? '')
+      setServingsPerSitting(row.servings_per_sitting ?? '')
     }
   }
 
@@ -105,6 +121,8 @@ function WeekPlanner() {
     setEditingKey(null)
     setSelectedValue('')
     setSkipReason('')
+    setServingsMade('')
+    setServingsPerSitting('')
   }
 
   async function handleSaveSlot(dateStr, slotType) {
@@ -129,22 +147,66 @@ function WeekPlanner() {
       )
     } else {
       const [type, id] = selectedValue.split(':')
-      await supabase.from('planned_meals').upsert(
-        {
-          plan_date: dateStr,
-          slot_type: slotType,
-          recipe_id: type === 'recipe' ? id : null,
-          meal_id: type === 'meal' ? id : null,
-          status: 'planned',
-          skip_reason: null,
-        },
-        { onConflict: 'plan_date,slot_type' }
-      )
+      const made = servingsMade ? Number(servingsMade) : null
+      const perSitting = servingsPerSitting ? Number(servingsPerSitting) : null
+      const remaining = made && perSitting ? made - perSitting : null
+
+      const { data: savedRow, error: saveError } = await supabase
+        .from('planned_meals')
+        .upsert(
+          {
+            plan_date: dateStr,
+            slot_type: slotType,
+            recipe_id: type === 'recipe' ? id : null,
+            meal_id: type === 'meal' ? id : null,
+            status: 'planned',
+            skip_reason: null,
+            servings_made: made,
+            servings_per_sitting: perSitting,
+            servings_remaining: remaining,
+            is_leftover: false,
+            leftover_source_id: null,
+          },
+          { onConflict: 'plan_date,slot_type' }
+        )
+        .select()
+        .single()
+
+      // If there's more than one sitting's worth left, try to auto-fill
+      // tomorrow's lunch with the leftovers (only if that slot is empty).
+      if (!saveError && savedRow && remaining && remaining > 0) {
+        const nextDateStr = toISODate(addDays(parseISODate(dateStr), 1))
+        const { data: existingNextSlot } = await supabase
+          .from('planned_meals')
+          .select('id')
+          .eq('plan_date', nextDateStr)
+          .eq('slot_type', 'lunch')
+          .maybeSingle()
+
+        if (!existingNextSlot) {
+          await supabase.from('planned_meals').insert({
+            plan_date: nextDateStr,
+            slot_type: 'lunch',
+            recipe_id: savedRow.recipe_id,
+            meal_id: savedRow.meal_id,
+            status: 'planned',
+            is_leftover: true,
+            leftover_source_id: savedRow.id,
+          })
+
+          await supabase
+            .from('planned_meals')
+            .update({ servings_remaining: remaining - perSitting })
+            .eq('id', savedRow.id)
+        }
+      }
     }
 
     setEditingKey(null)
     setSelectedValue('')
     setSkipReason('')
+    setServingsMade('')
+    setServingsPerSitting('')
     await loadWeek()
     setSavingSlot(false)
   }
@@ -190,10 +252,13 @@ function WeekPlanner() {
                 const key = `${dateStr}|${slotType}`
                 const row = slotsMap[key]
                 const isEditing = editingKey === key
+                const baseTitle = row ? row.recipes?.title || row.meals?.name : null
                 const label = row
                   ? row.status === 'skipped'
                     ? `Not cooking${row.skip_reason ? ` — ${row.skip_reason}` : ''}`
-                    : row.recipes?.title || row.meals?.name
+                    : row.is_leftover
+                    ? `Leftovers: ${baseTitle}`
+                    : baseTitle
                   : null
 
                 return (
@@ -237,6 +302,24 @@ function WeekPlanner() {
                             style={{ ...selectStyle, flex: 1, minWidth: '180px' }}
                           />
                         )}
+                        {(selectedValue.startsWith('recipe:') || selectedValue.startsWith('meal:')) && (
+                          <>
+                            <input
+                              type="number"
+                              value={servingsMade}
+                              onChange={(e) => setServingsMade(e.target.value)}
+                              placeholder="Servings made"
+                              style={{ ...selectStyle, width: '130px' }}
+                            />
+                            <input
+                              type="number"
+                              value={servingsPerSitting}
+                              onChange={(e) => setServingsPerSitting(e.target.value)}
+                              placeholder="Per sitting"
+                              style={{ ...selectStyle, width: '110px' }}
+                            />
+                          </>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleSaveSlot(dateStr, slotType)}
@@ -254,6 +337,11 @@ function WeekPlanner() {
                         {label ? (
                           <>
                             <span>{label}</span>
+                            {!row.is_leftover && row.servings_remaining > 0 && (
+                              <span style={{ fontSize: '0.8rem', color: '#888' }}>
+                                ({row.servings_remaining} more serving{row.servings_remaining === 1 ? '' : 's'} left)
+                              </span>
+                            )}
                             <button type="button" onClick={() => handleOpenEditor(key, row)} style={linkButtonStyle}>
                               change
                             </button>
