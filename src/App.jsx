@@ -8,6 +8,8 @@ import Meals from './Meals'
 import AddMeal from './AddMeal'
 import MealDetail from './MealDetail'
 import WeekPlanner from './WeekPlanner'
+import GroceryList from './GroceryList'
+import Pantry from './Pantry'
 
 const RECIPE_VIEWS = ['recipes', 'recipe-detail', 'add-recipe', 'edit-recipe']
 const MEAL_VIEWS = ['meals', 'meal-detail', 'add-meal']
@@ -68,6 +70,12 @@ function App() {
         <button onClick={() => setView('plan')} style={navButtonStyle(view === 'plan')}>
           Weekly Plan
         </button>
+        <button onClick={() => setView('grocery')} style={navButtonStyle(view === 'grocery')}>
+          Grocery List
+        </button>
+        <button onClick={() => setView('pantry')} style={navButtonStyle(view === 'pantry')}>
+          Pantry
+        </button>
         <button onClick={() => setView('preferences')} style={navButtonStyle(view === 'preferences')}>
           Preferences
         </button>
@@ -121,6 +129,10 @@ function App() {
       )}
 
       {view === 'plan' && <WeekPlanner />}
+
+      {view === 'grocery' && <GroceryList />}
+
+      {view === 'pantry' && <Pantry />}
     </div>
   )
 }
