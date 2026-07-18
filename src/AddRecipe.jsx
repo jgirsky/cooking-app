@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
 import ComponentSelect from './ComponentSelect'
+import TagPicker from './TagPicker'
 
 const emptyIngredientRow = { name: '', quantity: '', unit: '' }
 
@@ -14,6 +15,7 @@ function AddRecipe({ onSaved, onCancel }) {
   const [ingredientRows, setIngredientRows] = useState([{ ...emptyIngredientRow }])
   const [isComponentOption, setIsComponentOption] = useState(false)
   const [componentId, setComponentId] = useState('')
+  const [tagNames, setTagNames] = useState([])
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -47,6 +49,27 @@ function AddRecipe({ onSaved, onCancel }) {
 
     const { data: created, error: createError } = await supabase
       .from('ingredients')
+      .insert({ name: trimmed })
+      .select('id')
+      .single()
+
+    if (createError) throw createError
+    return created.id
+  }
+
+  async function findOrCreateTagId(name) {
+    const trimmed = name.trim()
+    const { data: existing, error: findError } = await supabase
+      .from('tags')
+      .select('id')
+      .ilike('name', trimmed)
+      .maybeSingle()
+
+    if (findError) throw findError
+    if (existing) return existing.id
+
+    const { data: created, error: createError } = await supabase
+      .from('tags')
       .insert({ name: trimmed })
       .select('id')
       .single()
@@ -96,6 +119,14 @@ function AddRecipe({ onSaved, onCancel }) {
           unit: row.unit.trim() || null,
         })
         if (linkError) throw linkError
+      }
+
+      for (const tagName of tagNames) {
+        const tagId = await findOrCreateTagId(tagName)
+        const { error: tagLinkError } = await supabase
+          .from('recipe_tags')
+          .insert({ recipe_id: newRecipe.id, tag_id: tagId })
+        if (tagLinkError) throw tagLinkError
       }
 
       onSaved()
@@ -175,6 +206,11 @@ function AddRecipe({ onSaved, onCancel }) {
             <ComponentSelect value={componentId} onChange={setComponentId} />
           </label>
         )}
+      </section>
+
+      <section>
+        <h3 style={{ marginBottom: '0.5rem' }}>Tags (optional)</h3>
+        <TagPicker value={tagNames} onChange={setTagNames} />
       </section>
 
       <section>

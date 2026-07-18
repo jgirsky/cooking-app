@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import ComponentSelect from './ComponentSelect'
+import TagPicker from './TagPicker'
 
 const emptyIngredientRow = { name: '', quantity: '', unit: '' }
 
@@ -14,6 +15,7 @@ function EditRecipe({ recipeId, onSaved, onCancel }) {
   const [ingredientRows, setIngredientRows] = useState([{ ...emptyIngredientRow }])
   const [isComponentOption, setIsComponentOption] = useState(false)
   const [componentId, setComponentId] = useState('')
+  const [tagNames, setTagNames] = useState([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -21,14 +23,18 @@ function EditRecipe({ recipeId, onSaved, onCancel }) {
   useEffect(() => {
     async function loadRecipe() {
       setLoading(true)
-      const [{ data: recipeData, error: recipeError }, { data: ingredientData, error: ingredientError }] =
-        await Promise.all([
-          supabase.from('recipes').select('*').eq('id', recipeId).single(),
-          supabase
-            .from('recipe_ingredients')
-            .select('id, quantity, unit, ingredients(name)')
-            .eq('recipe_id', recipeId),
-        ])
+      const [
+        { data: recipeData, error: recipeError },
+        { data: ingredientData, error: ingredientError },
+        { data: tagData, error: tagError },
+      ] = await Promise.all([
+        supabase.from('recipes').select('*').eq('id', recipeId).single(),
+        supabase
+          .from('recipe_ingredients')
+          .select('id, quantity, unit, ingredients(name)')
+          .eq('recipe_id', recipeId),
+        supabase.from('recipe_tags').select('tags(name)').eq('recipe_id', recipeId),
+      ])
 
       if (recipeError) {
         setErrorMessage(`Couldn't load recipe: ${recipeError.message}`)
@@ -54,6 +60,11 @@ function EditRecipe({ recipeId, onSaved, onCancel }) {
           }))
         )
       }
+
+      if (!tagError && tagData) {
+        setTagNames(tagData.map((t) => t.tags?.name).filter(Boolean))
+      }
+
       setLoading(false)
     }
     loadRecipe()
@@ -88,6 +99,27 @@ function EditRecipe({ recipeId, onSaved, onCancel }) {
 
     const { data: created, error: createError } = await supabase
       .from('ingredients')
+      .insert({ name: trimmed })
+      .select('id')
+      .single()
+
+    if (createError) throw createError
+    return created.id
+  }
+
+  async function findOrCreateTagId(name) {
+    const trimmed = name.trim()
+    const { data: existing, error: findError } = await supabase
+      .from('tags')
+      .select('id')
+      .ilike('name', trimmed)
+      .maybeSingle()
+
+    if (findError) throw findError
+    if (existing) return existing.id
+
+    const { data: created, error: createError } = await supabase
+      .from('tags')
       .insert({ name: trimmed })
       .select('id')
       .single()
@@ -144,6 +176,21 @@ function EditRecipe({ recipeId, onSaved, onCancel }) {
           unit: row.unit.trim() || null,
         })
         if (linkError) throw linkError
+      }
+
+      // Same wholesale-replace approach for tags.
+      const { error: deleteTagsError } = await supabase
+        .from('recipe_tags')
+        .delete()
+        .eq('recipe_id', recipeId)
+      if (deleteTagsError) throw deleteTagsError
+
+      for (const tagName of tagNames) {
+        const tagId = await findOrCreateTagId(tagName)
+        const { error: tagLinkError } = await supabase
+          .from('recipe_tags')
+          .insert({ recipe_id: recipeId, tag_id: tagId })
+        if (tagLinkError) throw tagLinkError
       }
 
       onSaved()
@@ -211,6 +258,11 @@ function EditRecipe({ recipeId, onSaved, onCancel }) {
             <ComponentSelect value={componentId} onChange={setComponentId} />
           </label>
         )}
+      </section>
+
+      <section>
+        <h3 style={{ marginBottom: '0.5rem' }}>Tags (optional)</h3>
+        <TagPicker value={tagNames} onChange={setTagNames} />
       </section>
 
       <section>
