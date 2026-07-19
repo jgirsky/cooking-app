@@ -116,6 +116,14 @@ function RecipeDetail({ recipeId, onBack, onEdit, refreshKey }) {
         )}
       </div>
 
+      {recipe.photo_path && (
+        <img
+          src={recipe.photo_path}
+          alt={recipe.title}
+          style={{ maxWidth: '100%', maxHeight: '400px', borderRadius: '8px', marginBottom: '1rem', display: 'block' }}
+        />
+      )}
+
       {tags.length > 0 && (
         <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           {tags.map((name) => (

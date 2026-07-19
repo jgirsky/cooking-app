@@ -16,6 +16,7 @@ function AddRecipe({ onSaved, onCancel }) {
   const [isComponentOption, setIsComponentOption] = useState(false)
   const [componentId, setComponentId] = useState('')
   const [tagNames, setTagNames] = useState([])
+  const [photoFile, setPhotoFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -129,6 +130,18 @@ function AddRecipe({ onSaved, onCancel }) {
         if (tagLinkError) throw tagLinkError
       }
 
+      if (photoFile) {
+        const path = `${newRecipe.id}/${Date.now()}-${photoFile.name}`
+        const { error: uploadError } = await supabase.storage.from('recipe-photos').upload(path, photoFile)
+        if (uploadError) throw uploadError
+        const { data: publicUrlData } = supabase.storage.from('recipe-photos').getPublicUrl(path)
+        const { error: photoUpdateError } = await supabase
+          .from('recipes')
+          .update({ photo_path: publicUrlData.publicUrl })
+          .eq('id', newRecipe.id)
+        if (photoUpdateError) throw photoUpdateError
+      }
+
       onSaved()
     } catch (err) {
       setErrorMessage(`Couldn't save recipe: ${err.message}`)
@@ -211,6 +224,13 @@ function AddRecipe({ onSaved, onCancel }) {
       <section>
         <h3 style={{ marginBottom: '0.5rem' }}>Tags (optional)</h3>
         <TagPicker value={tagNames} onChange={setTagNames} />
+      </section>
+
+      <section>
+        <label style={labelStyle}>
+          Photo (optional) — a cookbook page, or a picture of the finished dish
+          <input type="file" accept="image/*" onChange={(e) => setPhotoFile(e.target.files?.[0] || null)} />
+        </label>
       </section>
 
       <section>

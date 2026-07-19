@@ -16,6 +16,9 @@ function EditRecipe({ recipeId, onSaved, onCancel }) {
   const [isComponentOption, setIsComponentOption] = useState(false)
   const [componentId, setComponentId] = useState('')
   const [tagNames, setTagNames] = useState([])
+  const [existingPhotoUrl, setExistingPhotoUrl] = useState(null)
+  const [photoFile, setPhotoFile] = useState(null)
+  const [removePhoto, setRemovePhoto] = useState(false)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -50,6 +53,7 @@ function EditRecipe({ recipeId, onSaved, onCancel }) {
       setNotes(recipeData.notes || '')
       setIsComponentOption(recipeData.is_component_option || false)
       setComponentId(recipeData.component_id || '')
+      setExistingPhotoUrl(recipeData.photo_path || null)
 
       if (!ingredientError && ingredientData && ingredientData.length > 0) {
         setIngredientRows(
@@ -142,6 +146,18 @@ function EditRecipe({ recipeId, onSaved, onCancel }) {
     const captureStatus = filledRows.length > 0 ? 'structured' : 'quick_capture'
 
     try {
+      let photoPath = existingPhotoUrl
+      if (removePhoto) {
+        photoPath = null
+      }
+      if (photoFile) {
+        const path = `${recipeId}/${Date.now()}-${photoFile.name}`
+        const { error: uploadError } = await supabase.storage.from('recipe-photos').upload(path, photoFile)
+        if (uploadError) throw uploadError
+        const { data: publicUrlData } = supabase.storage.from('recipe-photos').getPublicUrl(path)
+        photoPath = publicUrlData.publicUrl
+      }
+
       const { error: updateError } = await supabase
         .from('recipes')
         .update({
@@ -154,6 +170,7 @@ function EditRecipe({ recipeId, onSaved, onCancel }) {
           notes: notes.trim() || null,
           is_component_option: isComponentOption,
           component_id: isComponentOption && componentId ? componentId : null,
+          photo_path: photoPath,
           updated_at: new Date().toISOString(),
         })
         .eq('id', recipeId)
@@ -263,6 +280,30 @@ function EditRecipe({ recipeId, onSaved, onCancel }) {
       <section>
         <h3 style={{ marginBottom: '0.5rem' }}>Tags (optional)</h3>
         <TagPicker value={tagNames} onChange={setTagNames} />
+      </section>
+
+      <section>
+        <h3 style={{ marginBottom: '0.5rem' }}>Photo (optional)</h3>
+        {existingPhotoUrl && !removePhoto && (
+          <div style={{ marginBottom: '0.5rem' }}>
+            <img src={existingPhotoUrl} alt="Recipe" style={{ maxWidth: '200px', borderRadius: '6px', display: 'block', marginBottom: '0.5rem' }} />
+            <button type="button" onClick={() => setRemovePhoto(true)} style={secondaryButtonStyle}>
+              Remove photo
+            </button>
+          </div>
+        )}
+        {removePhoto && (
+          <p style={{ fontSize: '0.85rem', color: '#666' }}>
+            Photo will be removed when you save.{' '}
+            <button type="button" onClick={() => setRemovePhoto(false)} style={undoLinkStyle}>
+              Undo
+            </button>
+          </p>
+        )}
+        <label style={labelStyle}>
+          {existingPhotoUrl ? 'Replace photo' : 'Add a photo'}
+          <input type="file" accept="image/*" onChange={(e) => setPhotoFile(e.target.files?.[0] || null)} />
+        </label>
       </section>
 
       <section>
@@ -385,6 +426,16 @@ const backButtonStyle = {
   padding: 0,
   fontSize: '0.95rem',
   textAlign: 'left',
+}
+
+const undoLinkStyle = {
+  background: 'none',
+  border: 'none',
+  color: '#2f7a4d',
+  cursor: 'pointer',
+  fontSize: '0.85rem',
+  padding: 0,
+  textDecoration: 'underline',
 }
 
 export default EditRecipe

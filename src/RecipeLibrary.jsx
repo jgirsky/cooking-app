@@ -106,27 +106,36 @@ function RecipeLibrary({ onAddClick, onSelectRecipe, refreshKey }) {
 
       <ul style={{ listStyle: 'none', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {filteredRecipes.map((recipe) => (
-          <li key={recipe.id} onClick={() => onSelectRecipe(recipe.id)} style={cardStyle}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong>
-                {recipe.is_favorite && <span style={{ color: '#b8860b' }}>★ </span>}
-                {recipe.title}
-              </strong>
-              {recipe.rating ? <span>{'★'.repeat(recipe.rating)}</span> : null}
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', fontSize: '0.85rem', color: '#555', flexWrap: 'wrap' }}>
-              <span style={badgeStyle}>{SOURCE_LABELS[recipe.source_type] || recipe.source_type}</span>
-              <span style={badgeStyle}>
-                {recipe.capture_status === 'structured' ? 'Structured' : 'Quick capture'}
-              </span>
-              {recipe.times_cooked > 0 && <span style={badgeStyle}>Cooked {recipe.times_cooked}x</span>}
-              {(recipe.recipe_tags || []).map((rt) =>
-                rt.tags?.name ? (
-                  <span key={rt.tags.name} style={tagBadgeStyle}>
-                    {rt.tags.name}
-                  </span>
-                ) : null
-              )}
+          <li key={recipe.id} onClick={() => onSelectRecipe(recipe.id)} style={{ ...cardStyle, display: 'flex', gap: '0.75rem' }}>
+            {recipe.photo_path && (
+              <img
+                src={recipe.photo_path}
+                alt=""
+                style={{ width: '56px', height: '56px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
+              />
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <strong>
+                  {recipe.is_favorite && <span style={{ color: '#b8860b' }}>★ </span>}
+                  {recipe.title}
+                </strong>
+                {recipe.rating ? <span>{'★'.repeat(recipe.rating)}</span> : null}
+              </div>
+              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem', fontSize: '0.85rem', color: '#555', flexWrap: 'wrap' }}>
+                <span style={badgeStyle}>{SOURCE_LABELS[recipe.source_type] || recipe.source_type}</span>
+                <span style={badgeStyle}>
+                  {recipe.capture_status === 'structured' ? 'Structured' : 'Quick capture'}
+                </span>
+                {recipe.times_cooked > 0 && <span style={badgeStyle}>Cooked {recipe.times_cooked}x</span>}
+                {(recipe.recipe_tags || []).map((rt) =>
+                  rt.tags?.name ? (
+                    <span key={rt.tags.name} style={tagBadgeStyle}>
+                      {rt.tags.name}
+                    </span>
+                  ) : null
+                )}
+              </div>
             </div>
           </li>
         ))}
